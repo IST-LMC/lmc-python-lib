@@ -24,3 +24,13 @@ import sys
 sys.path += [ '/usr/local/lib/lmc-python' ]
 import lmc.swift
 ```
+
+### Link to default python lib directory
+
+The following can be used to avoid having to modify the sys.path within
+a script while still keeping the bulk of the library separate from regular
+python libraries.
+
+```bash
+ln -s /usr/local/lib/lmc-python/lmc `python -c "import site; print(site.getsitepackages())[0]"`/lmc
+```
