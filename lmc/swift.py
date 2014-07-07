@@ -31,3 +31,11 @@ def upload(bucket, name, from_folder):
   # TODO: Only update if checksums don't match
   cont.upload_file(from_path, name)
 
+def list_objects(bucket, ignore_partial=True):
+  swift_connection = connection()
+  cont = swift_connection.get_container(bucket)
+  objects = cont.get_objects()
+  if ignore_partial:
+    return [obj for obj in objects if obj.content_type != 'application/octet-stream']
+  else:
+    return objects
