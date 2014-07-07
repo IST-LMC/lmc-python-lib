@@ -39,3 +39,6 @@ def list_objects(bucket, ignore_partial=True):
 		return [obj for obj in objects if obj.content_type != 'application/octet-stream']
 	else:
 		return objects
+
+def find_objects(bucket, regex):
+	return [obj for obj in list_objects(bucket) if regex.match(obj.name)]
