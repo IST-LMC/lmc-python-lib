@@ -42,3 +42,32 @@ def list_objects(bucket, ignore_partial=True):
 
 def find_objects(bucket, regex):
 	return [obj for obj in list_objects(bucket) if regex.match(obj.name)]
+
+# Get the x-timestamp of the object (this involves a metadata query)
+def get_timestamp(obj):
+	return float(obj.get_metadata('x-timestamp')['x-timestamp'])
+
+# Sort objects in the given list by their x-timestamp. If descending=True, the list will
+# start with the highest value first. The default will return a list with the lowest value
+# first.
+#
+# Warning: Metadata gets fetched from every object in the list using this function. On large
+# lists, it could become quite time consuming.
+def sort_objects_by_time(obj_list, descending=False):
+	return sorted(obj_list, key=get_timestamp, reverse=descending)
+
+# Find the object with the time closest to the given timestamp. If there is an exact match,
+# the matching object will be returned. Otherwise, the object returned will be the first
+# object before the timestamp. If after=True, it will be the first object equal to or after
+# the timestamp.
+#
+# Warning: Metadata gets fetched from every object in the list using this function. On large
+# lists, it could become quite time consuming.
+def object_closest_to_time(obj_list, timestamp, after=False):
+	sorted_objects = sort_objects_by_time(obj_list, descending=(not after))
+	for obj in sorted_objects:
+		if after and get_timestamp(obj) >= timestamp:
+			return obj
+		elif not after and get_timestamp(obj) <= timestamp:
+			return obj
+	return None
