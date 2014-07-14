@@ -20,7 +20,6 @@ def fetch(bucket, name, to_folder):
 		file.close()
 		return True
 	except pyrax.exceptions.NoSuchObject as e:
-		print e
 		return False
 
 def cache_fetch(bucket, name, cache_folder):
