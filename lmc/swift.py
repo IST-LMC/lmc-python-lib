@@ -39,6 +39,8 @@ def list_objects(bucket, ignore_partial=True):
 	cont = swift_connection.get_container(bucket)
 	objects = cont.get_objects()
 	if ignore_partial:
+		# TODO: It turns out that application/octet-stream is also what plain .gz files get labelled as.
+		# We need a better indicator for when a file is part of a larger object.
 		return [obj for obj in objects if obj.content_type != 'application/octet-stream']
 	else:
 		return objects
@@ -74,3 +76,15 @@ def object_closest_to_time(obj_list, timestamp, after=False):
 		elif not after and get_timestamp(obj) <= timestamp:
 			return obj
 	return None
+
+def most_recent_object(obj_list_or_bucket_name):
+	if not isinstance( obj_list_or_bucket_name, (frozenset, list, set, tuple) ):
+		obj_list = list_objects(obj_list_or_bucket_name)
+	else:
+		obj_list = obj_list_or_bucket_name
+	sorted_list = sort_objects_by_time(obj_list, descending=True)
+
+	if len(sorted_list) >= 1:
+		return sorted_list[0]
+	else:
+		return None
