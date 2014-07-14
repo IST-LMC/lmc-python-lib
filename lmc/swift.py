@@ -18,14 +18,18 @@ def fetch(bucket, name, to_folder):
 		for chunk in obj.fetch(chunk_size=1024*1024):
 			file.write(chunk)
 		file.close()
+		return True
 	except pyrax.exceptions.NoSuchObject as e:
 		print e
+		return False
 
 def cache_fetch(bucket, name, cache_folder):
 	cache_path = os.path.join(cache_folder, name)
 	# TODO: also fetch if checksums don't match (don't just assume the file's good)
 	if not os.path.isfile(cache_path):
-		fetch(bucket=bucket, name=name, to_folder=cache_folder)
+		return fetch(bucket=bucket, name=name, to_folder=cache_folder)
+	else:
+		return True
 
 def upload(bucket, name, from_folder):
 	swift_connection = connection()
