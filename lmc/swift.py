@@ -18,7 +18,7 @@ def fetch(bucket, name, to_folder):
 		for chunk in obj.fetch(chunk_size=1024*1024):
 			file.write(chunk)
 		file.close()
-		timestamp = int(obj.get_metadata('x-timestamp')['x-timestamp'])
+		timestamp = float(obj.get_metadata('x-timestamp')['x-timestamp'])
 		os.utime( fetch_path, (timestamp, timestamp) )
 		return True
 	except pyrax.exceptions.NoSuchObject as e:
