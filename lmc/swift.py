@@ -11,12 +11,15 @@ def connection():
 def fetch(bucket, name, to_folder):
 	swift_connection = connection()
 	cont = swift_connection.get_container(bucket)
-	obj = cont.get_object(name)
-	fetch_path = os.path.join(to_folder, name)
-	file = open(fetch_path, "w")
-	for chunk in obj.fetch(chunk_size=1024*1024):
-		file.write(chunk)
-	file.close()
+	try:
+		obj = cont.get_object(name)
+		fetch_path = os.path.join(to_folder, name)
+		file = open(fetch_path, "w")
+		for chunk in obj.fetch(chunk_size=1024*1024):
+			file.write(chunk)
+		file.close()
+	except pyrax.exceptions.NoSuchObject as e:
+		print e
 
 def cache_fetch(bucket, name, cache_folder):
 	cache_path = os.path.join(cache_folder, name)
