@@ -32,12 +32,12 @@ def cache_fetch(bucket, name, cache_folder):
 	else:
 		return True
 
-def upload(bucket, name, from_folder):
+def upload(bucket, name, from_folder, ttl=None):
 	swift_connection = connection()
 	cont = swift_connection.get_container(bucket)
 	from_path = os.path.join(from_folder, name)
 	# TODO: Only update if checksums don't match
-	cont.upload_file(from_path, name)
+	cont.upload_file(from_path, name, ttl=ttl)
 
 def list_objects(bucket, ignore_partial=True):
 	swift_connection = connection()
