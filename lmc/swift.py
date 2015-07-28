@@ -1,28 +1,43 @@
-import pyrax, os, swiftclient
+import os, swiftclient, swiftclient.service
+from swiftclient.service import SwiftUploadObject
 
-def connection():
-	pyrax.settings.set('identity_type', 'keystone')
-	pyrax.set_setting("auth_endpoint", os.environ["OS_AUTH_URL"])
-	pyrax.set_credentials(username=os.environ["OS_USERNAME"], api_key=os.environ["OS_PASSWORD"], tenant_id=os.environ["OS_TENANT_ID"])
-	conn = pyrax.connect_to_cloudfiles(os.environ["OS_REGION_NAME"])
-	conn.max_file_size = 1073741823  # 1GB - 1
-	return conn
+CONN = None
+SWIFT_SERVICE = None
+
+def swift_connection():
+	global CONN
+	if not CONN:
+		CONN = swiftclient.Connection(
+			user=os.environ["OS_USERNAME"],
+			tenant_name=os.environ["OS_TENANT_NAME"],
+			key=os.environ["OS_PASSWORD"],
+			authurl=os.environ["OS_AUTH_URL"],
+			auth_version=2)
+	# conn.max_file_size = 1073741823  # 1GB - 1
+	return CONN
+
+def swift_service():
+	global SWIFT_SERVICE
+	if not SWIFT_SERVICE:
+		SWIFT_SERVICE = swiftclient.service.SwiftService({
+			"os_username": os.environ["OS_USERNAME"],
+			"os_tenant_name": os.environ["OS_TENANT_NAME"],
+			"os_password":os.environ["OS_PASSWORD"],
+			"os_auth_url": os.environ["OS_AUTH_URL"],
+			"auth_version": 2 })
+	return SWIFT_SERVICE
 
 def fetch(bucket, name, to_folder):
-	swift_connection = connection()
-	cont = swift_connection.get_container(bucket)
 	try:
-		obj = cont.get_object(name)
 		fetch_path = os.path.join(to_folder, name)
-		file = open(fetch_path, "w")
-		for chunk in obj.fetch(chunk_size=1024*1024):
-			file.write(chunk)
-		file.close()
-		timestamp = float(obj.get_metadata('x-timestamp')['x-timestamp'])
-		os.utime( fetch_path, (timestamp, timestamp) )
-		return True
-	except pyrax.exceptions.NoSuchObject as e:
-		return False
+		download = swift_service().download(bucket, [ name ], { 'out_file': fetch_path }).next()
+		return 'success' in download and download['success']
+	except swiftclient.exceptions.ClientException as e:
+		if(e.http_status == 404):
+			print "Error: object '%s' not found in container '%s'" % (name, bucket)
+	 		return False
+		else:
+			raise e
 
 def cache_fetch(bucket, name, cache_folder):
 	cache_path = os.path.join(cache_folder, name)
@@ -32,30 +47,62 @@ def cache_fetch(bucket, name, cache_folder):
 	else:
 		return True
 
-def upload(bucket, name, from_folder, ttl=None):
-	swift_connection = connection()
-	cont = swift_connection.get_container(bucket)
+def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
 	from_path = os.path.join(from_folder, name)
+	upload_object = SwiftUploadObject(from_path, object_name=name)
+
+	delete_after_header = 'X-Delete-After:%i' % ttl
+	options = {
+		'header': [ delete_after_header ],
+		'segment_size': __normalized_segment_size(segment_size)
+	}
+
+	### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
+	segments = []
+	segment_container = None
+	### /Workaround
+
+	for r in swift_service().upload(bucket, [ upload_object ], options):
+		if not r['success']:
+			# Only raise an error if it's on an object. We don't expect containers
+			# to be able to be created by users with reduced permissions, but they
+			# can upload objects.
+			if not ('action' in r and r['action'] == "create_container"):
+				raise r['error']
+		else:
+			### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
+			if 'action' in r and r['action'] == "upload_segment":
+				segment_path = [x for x in r['segment_location'].split(os.path.sep) if x != '']
+				segment_container = segment_path.pop(0)
+				segments.append(os.path.sep.join(segment_path))
+			### /Workaround
+
+	### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
+	if segment_container and len(segments) > 0:
+		for r in swift_service().post(segment_container, segments, { 'header': [ delete_after_header ]}):
+			if not r['success']:
+				print "Could not set expiration for: %s" % r['object']
+				print r['error']
+	### /Workaround
+
 	# TODO: Only update if checksums don't match
-	cont.upload_file(from_path, name, ttl=ttl)
 
 def list_objects(bucket, ignore_partial=True):
-	swift_connection = connection()
-	cont = swift_connection.get_container(bucket)
+	cont = SwiftContainer(bucket)
 	objects = cont.get_objects()
 	if ignore_partial:
 		# TODO: It turns out that application/octet-stream is also what plain .gz files get labelled as.
 		# We need a better indicator for when a file is part of a larger object.
-		return [obj for obj in objects if obj.content_type != 'application/octet-stream']
+		return [obj for obj in objects if obj['content_type'] != 'application/octet-stream']
 	else:
 		return objects
 
 def find_objects(bucket, regex):
-	return [obj for obj in list_objects(bucket) if regex.match(obj.name)]
+	return [obj for obj in list_objects(bucket) if regex.match(obj['name'])]
 
 # Get the x-timestamp of the object (this involves a metadata query)
 def get_timestamp(obj):
-	return float(obj.get_metadata('x-timestamp')['x-timestamp'])
+	return float(obj.get_metadata()['x-timestamp'])
 
 # Sort objects in the given list by their x-timestamp. If descending=True, the list will
 # start with the highest value first. The default will return a list with the lowest value
@@ -93,3 +140,45 @@ def most_recent_object(obj_list_or_bucket_name):
 		return sorted_list[0]
 	else:
 		return None
+
+class SwiftContainer:
+	def __init__(self, bucket):
+		self.name = bucket
+		self.raw_container = swift_connection().get_container(self.name)
+
+	def __getitem__(self, key):
+		return self.raw_container[key]
+
+	def get_object(self, name):
+		return SwiftObject(swift_connection().get_object(self.name, name), container=self)
+
+	def get_objects(self):
+		return [SwiftObject(obj,container=self) for obj in self.raw_container[1]]
+
+class SwiftObject:
+	def __init__(self, raw_object, container):
+		self.raw_object = raw_object
+		self.container = container
+		self.metadata = None
+
+	def __getitem__(self, key):
+		return self.raw_object[key]
+
+	def get_metadata(self):
+		if not self.metadata:
+			self.metadata = swift_connection().head_object(self.container.name, self.raw_object['name'])
+		return self.metadata
+
+def __normalized_segment_size(segment_size):
+	# Adapted from python-swiftclient code
+    try:
+        # If segment size only has digits assume it is bytes
+        return int(segment_size)
+    except ValueError:
+        try:
+            size_mod = "BKMG".index(segment_size[-1].upper())
+            multiplier = int(segment_size[:-1])
+        except ValueError:
+            print("Invalid segment size")
+
+        return str((1024 ** size_mod) * multiplier)
