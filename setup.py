@@ -1,5 +1,5 @@
-from distutils.core import setup
+from distutils.core import setup, find_packages
 setup(name='lmc-python-lib',
       version='1.0',
-      py_modules=['lmc'],
+      packages=find_packages(),
       )
