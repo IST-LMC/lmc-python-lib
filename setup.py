@@ -5,6 +5,7 @@ setup(name='lmc-python-lib',
 	  install_requires = [
 	  	'python-swiftclient',
 		'python-keystoneclient',
+		'certifi',
 		'pyopenssl',
 		'ndg-httpsclient',
 		'pyasn1']
