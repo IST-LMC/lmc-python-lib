@@ -31,3 +31,7 @@ os.system("rm -fr /tmp/lmc-python-test")
 # 2. test fetching the most recent object in a container
 # 3. test fetching the object closest to a time in a container
 # 4. test that cache fetch doesn't grab the file if it's present on the local system
+# 5. test that ACLs work properly:
+#		a. create users that can't create containers but can read/write to them
+#		b. create users that can read from a container but can't write to it
+# 6. test that setting the ttl properly expires objects and any related segments
