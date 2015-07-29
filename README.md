@@ -3,6 +3,13 @@ lmc-python-lib
 
 ### Getting started
 
+#### Cloning the repository
+
+```bash
+git clone git@github.com:cybera/lmc-python-lib.git
+git checkout no-pyrax
+```
+
 #### Creating the development environment
 
 1. Put your credentials in vagrant/credentials (files with the extension .openrc or .sh in the credentials folder will be ignored by git)
@@ -12,27 +19,36 @@ lmc-python-lib
 	*VirtualBox provider:*
 
 	```bash
+	cd vagrant
 	vagrant box add ubuntu/trusty64
-	vagrant up
+	vagrant up --provider virtualbox
 	```
 
 	*VMWare provider:*
 
 	```bash
+	cd vagrant
 	vagrant box add cybera/ubuntu-trusty
-	vagrant up
+	vagrant up --provider vmware_fusion
 	```
+
+#### SSH into the VM
+
+```bash
+cd vagrant
+vagrant ssh
+```
 
 #### Do everything
 
 ```bash
 source /vagrant/credentials/your-credentials.openrc
-/vagrant/scripts/rebuild-virtualenv.sh
+sudo /vagrant/scripts/rebuild-virtualenv.sh
 /vagrant/scripts/setup-test-containers.sh
 /vagrant/scripts/test-lmc-python.py
 ```
 
-#### scripts
+#### Scripts
 
 *rebuild-virtualenv.sh*
 
@@ -45,6 +61,18 @@ Creates `lmc-python-test` and `lmc-python-test_segments` for use with the test s
 *test-lmc-python.py*
 
 Example script to exercise the lmc-python-lib library.
+
+#### Installing lmc-python-lib via pip
+
+*(...as done in the rebuild-virtualenv.sh script...)*
+
+```bash
+pip install git+git://github.com/cybera/lmc-python-lib.git@no-pyrax
+```
+
+#### Building an Ubuntu install package
+
+TODO...
 
 #### Notes
 
