@@ -1,36 +1,53 @@
 lmc-python-lib
 ==============
 
-### Purpose
+### Getting started
 
-This may not be useful at all outside of the LMC project, unless the odd code
-snippet helps someone else using pyrax with swift (or some other future thing
-that we add here). We're writing more and more operational scripts in python
-and this should help DRY them up a bit. If any of it proves to be more generally
-applicable outside of the project, it may make sense to turn it into a python
-egg. Until then, there's this...
+#### Creating the development environment
 
-### Example deployment
+1. Put your credentials in vagrant/credentials (files with the extension .openrc or .sh in the credentials folder will be ignored by git)
 
-```bash
-cd /usr/local/lib
-git clone https://github.com/cybera/lmc-python-lib.git lmc-python
-```
+2. Create your vagrant VM:
 
-### Example usage
+	*VirtualBox provider:*
 
-```python
-import sys
-sys.path += [ '/usr/local/lib/lmc-python' ]
-import lmc.swift
-```
+	```bash
+	vagrant box add ubuntu/trusty64
+	vagrant up
+	```
 
-### Link to default python lib directory
+	*VMWare provider:*
 
-The following can be used to avoid having to modify the sys.path within
-a script while still keeping the bulk of the library separate from regular
-python libraries.
+	```bash
+	vagrant box add cybera/ubuntu-trusty
+	vagrant up
+	```
+
+#### Do everything
 
 ```bash
-ln -s /usr/local/lib/lmc-python/lmc `python -c "import site; print(site.getsitepackages())[0]"`/lmc
+source /vagrant/credentials/your-credentials.openrc
+/vagrant/scripts/rebuild-virtualenv.sh
+/vagrant/scripts/setup-test-containers.sh
+/vagrant/scripts/test-lmc-python.py
 ```
+
+#### scripts
+
+*rebuild-virtualenv.sh*
+
+Creates a virtual environment in /usr/local/lmc-python and installs lmc-python-lib and its dependencies in that location. If run again, it will remove the old version before re-creating.
+
+*setup-test-containers.sh*
+
+Creates `lmc-python-test` and `lmc-python-test_segments` for use with the test script.
+
+*test-lmc-python.py*
+
+Example script to exercise the lmc-python-lib library.
+
+#### Notes
+
+- Currently the containers used in the test are hardcoded, so these tests can only be run by a single person in an OpenStack project.
+
+- Containers aren't given read/write ACLs so that these can be tested (Coming soon!)
