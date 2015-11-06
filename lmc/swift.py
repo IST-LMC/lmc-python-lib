@@ -83,8 +83,8 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
 		for r in swift_service().post(segment_container, segments, { 'header': [ delete_after_header ]}):
 			if not r['success']:
 				set_expiration_error = True
-		print "Error response in setting expiration for some segments on: %s." % name
-		print "The segments will likely still end up with a correct expiration time."
+		print "WARNING: Error response in setting expiration for some segments on: %s." % name
+		print "WARNING: The segments will likely still end up with a correct expiration time."
 	### /Workaround
 
 	# TODO: Only update if checksums don't match
