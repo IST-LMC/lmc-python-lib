@@ -79,10 +79,12 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
 
 	### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
 	if segment_container and len(segments) > 0:
+		set_expiration_error = False
 		for r in swift_service().post(segment_container, segments, { 'header': [ delete_after_header ]}):
 			if not r['success']:
-				print "Could not set expiration for: %s" % r['object']
-				print r['error']
+				set_expiration_error = True
+		print "Error response in setting expiration for some segments on: %s." % name
+		print "The segments will likely still end up with a correct expiration time."
 	### /Workaround
 
 	# TODO: Only update if checksums don't match
