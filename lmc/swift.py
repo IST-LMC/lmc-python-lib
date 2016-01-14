@@ -51,9 +51,13 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
 	from_path = os.path.join(from_folder, name)
 	upload_object = SwiftUploadObject(from_path, object_name=name)
 
-	delete_after_header = 'X-Delete-After:%i' % ttl
+    headers = []
+    if ttl:
+        delete_after_header = 'X-Delete-After:%i' % ttl
+        headers.append(delete_after_header)
+
 	options = {
-		'header': [ delete_after_header ],
+		'header': headers,
 		'segment_size': __normalized_segment_size(segment_size)
 	}
 
