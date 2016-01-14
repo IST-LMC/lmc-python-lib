@@ -1,6 +1,9 @@
 import os, swiftclient, swiftclient.service
 from swiftclient.service import SwiftUploadObject
 
+import warnings
+warnings.filterwarnings("ignore", message="Providing attr without filter_value to get_urls\(\) is deprecated")
+
 CONN = None
 SWIFT_SERVICE = None
 
@@ -35,7 +38,7 @@ def fetch(bucket, name, to_folder):
     except swiftclient.exceptions.ClientException as e:
         if(e.http_status == 404):
             print "Error: object '%s' not found in container '%s'" % (name, bucket)
-             return False
+            return False
         else:
             raise e
 
