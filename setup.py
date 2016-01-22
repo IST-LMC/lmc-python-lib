@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 setup(name='lmc-python-lib',
-      version='1.2',
+      version='1.3',
       packages=find_packages(),
 	  install_requires = [
 	  	'python-swiftclient',
