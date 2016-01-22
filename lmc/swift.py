@@ -109,6 +109,16 @@ def list_objects(bucket, ignore_partial=True):
 def find_objects(bucket, regex):
     return [obj for obj in list_objects(bucket) if regex.match(obj['name'])]
 
+def get_object(bucket, name):
+    cont = SwiftContainer(bucket)
+    try:
+        return cont.get_object(name)
+    except swiftclient.exceptions.ClientException as e:
+        if(e.http_status == 404):
+            return None
+        else:
+            raise e
+
 # Get the x-timestamp of the object (this involves a metadata query)
 def get_timestamp(obj):
     return float(obj.get_metadata()['x-timestamp'])
@@ -157,7 +167,7 @@ class SwiftContainer:
 
     def __getitem__(self, key):
         return self.raw_container[key]
-
+        
     def get_object(self, name):
         return SwiftObject(swift_connection().get_object(self.name, name), container=self)
 

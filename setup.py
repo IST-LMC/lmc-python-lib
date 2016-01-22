@@ -8,5 +8,6 @@ setup(name='lmc-python-lib',
 		'certifi',
 		'pyopenssl',
 		'ndg-httpsclient',
-		'pyasn1']
+		'pyasn1',
+        'psycopg2']
       )
