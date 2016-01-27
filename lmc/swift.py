@@ -115,7 +115,7 @@ def find_objects(bucket, regex):
 def get_object(bucket, name):
     try:
         stat_info = next(swift_service().stat(bucket, [ name ]))
-        obj = SwiftObject(swift_connection().get_object(bucket, name), container=bucket, metadata=stat_info['headers'])
+        obj = SwiftObject(name, container=bucket, metadata=stat_info['headers'])
         return obj
     except swiftclient.exceptions.ClientException as e:
         if(e.http_status == 404):
