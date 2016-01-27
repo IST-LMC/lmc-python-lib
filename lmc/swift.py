@@ -97,8 +97,11 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
     # TODO: Only update if checksums don't match
 
 def list_objects(bucket, ignore_partial=True):
-    cont = SwiftContainer(bucket)
-    objects = cont.get_objects()
+    objects = []
+    listing_chunks = swift_service().list(bucket)
+    for listing_chunk in listing_chunks:
+        objects.extend([ SwiftObject(obj['name'], container=bucket, raw_object=obj) for obj in listing_chunk['listing'] ])
+            
     if ignore_partial:
         # TODO: It turns out that application/octet-stream is also what plain .gz files get labelled as.
         # We need a better indicator for when a file is part of a larger object.
@@ -110,9 +113,10 @@ def find_objects(bucket, regex):
     return [obj for obj in list_objects(bucket) if regex.match(obj['name'])]
 
 def get_object(bucket, name):
-    cont = SwiftContainer(bucket)
     try:
-        return cont.get_object(name)
+        stat_info = next(swift_service().stat(bucket, [ name ]))
+        obj = SwiftObject(swift_connection().get_object(bucket, name), container=bucket, metadata=stat_info['headers'])
+        return obj
     except swiftclient.exceptions.ClientException as e:
         if(e.http_status == 404):
             return None
@@ -160,32 +164,19 @@ def most_recent_object(obj_list_or_bucket_name):
     else:
         return None
 
-class SwiftContainer:
-    def __init__(self, bucket):
-        self.name = bucket
-        self.raw_container = swift_connection().get_container(self.name)
-
-    def __getitem__(self, key):
-        return self.raw_container[key]
-        
-    def get_object(self, name):
-        return SwiftObject(swift_connection().get_object(self.name, name), container=self)
-
-    def get_objects(self):
-        return [SwiftObject(obj,container=self) for obj in self.raw_container[1]]
-
 class SwiftObject:
-    def __init__(self, raw_object, container):
+    def __init__(self, name, container, raw_object=None, metadata=None):
+        self.name = name
         self.raw_object = raw_object
         self.container = container
-        self.metadata = None
+        self.metadata = metadata
 
     def __getitem__(self, key):
         return self.raw_object[key]
 
     def get_metadata(self):
         if not self.metadata:
-            self.metadata = swift_connection().head_object(self.container.name, self.raw_object['name'])
+            self.metadata = next(swift_service().stat(self.container, [ self.name ]))['headers']
         return self.metadata
 
 def __normalized_segment_size(segment_size):
