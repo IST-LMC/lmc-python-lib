@@ -119,6 +119,12 @@ def get_object(bucket, name):
     else:
         return None
 
+def expire_object(bucket, name, ttl):
+    delete_after_header = 'X-Delete-After:%i' % ttl
+    result = next(swift_service().post(bucket, [ name ], { 'header': [ delete_after_header ]}))
+    if not result['success']:
+        print "ERROR: Couldn't set ttl on %s/%s" % (bucket, name)
+
 # Get the x-timestamp of the object (this involves a metadata query)
 def get_timestamp(obj):
     return float(obj.get_metadata()['x-timestamp'])
