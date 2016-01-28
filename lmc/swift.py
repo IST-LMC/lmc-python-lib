@@ -113,15 +113,11 @@ def find_objects(bucket, regex):
     return [obj for obj in list_objects(bucket) if regex.match(obj['name'])]
 
 def get_object(bucket, name):
-    try:
-        stat_info = next(swift_service().stat(bucket, [ name ]))
-        obj = SwiftObject(name, container=bucket, metadata=stat_info['headers'])
-        return obj
-    except swiftclient.exceptions.ClientException as e:
-        if(e.http_status == 404):
-            return None
-        else:
-            raise e
+    stat_info = next(swift_service().stat(bucket, [ name ]))
+    if stat_info['success']:
+        return SwiftObject(name, container=bucket, metadata=stat_info['headers'])
+    else
+        return None
 
 # Get the x-timestamp of the object (this involves a metadata query)
 def get_timestamp(obj):
