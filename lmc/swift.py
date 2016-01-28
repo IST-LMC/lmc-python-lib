@@ -116,7 +116,7 @@ def get_object(bucket, name):
     stat_info = next(swift_service().stat(bucket, [ name ]))
     if stat_info['success']:
         return SwiftObject(name, container=bucket, metadata=stat_info['headers'])
-    else
+    else:
         return None
 
 # Get the x-timestamp of the object (this involves a metadata query)
