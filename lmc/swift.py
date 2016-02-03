@@ -6,6 +6,9 @@ warnings.filterwarnings("ignore", message="Providing attr without filter_value t
 
 CONN = None
 SWIFT_SERVICE = None
+upload_buffer = {}
+download_buffer = {}
+upload_success_message = None
 
 def swift_connection():
     global CONN
@@ -50,9 +53,10 @@ def cache_fetch(bucket, name, cache_folder):
     else:
         return True
 
-def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
+def upload(bucket, name, from_folder, ttl=None, segment_size="400M", buffer_size=0):
+    global upload_buffer
+
     from_path = os.path.join(from_folder, name)
-    upload_object = SwiftUploadObject(from_path, object_name=name)
 
     headers = []
     if ttl:
@@ -64,12 +68,26 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
         'segment_size': __normalized_segment_size(segment_size)
     }
 
+    upload_object = SwiftUploadObject(from_path, object_name=name, options=options)
+    if bucket not in upload_buffer:
+        upload_buffer[bucket] = []
+
+    upload_buffer[bucket].append(upload_object)
+    if len(upload_buffer[bucket]) <= buffer_size:
+        return
+        
+    flush_upload_buffer(bucket)
+
+def flush_upload_buffer(bucket):
+    global upload_buffer
+    global upload_success_message
+
     ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
     segments = []
     segment_container = None
     ### /Workaround
 
-    for r in swift_service().upload(bucket, [ upload_object ], options):
+    for r in swift_service().upload(bucket, upload_buffer[bucket]):
         if not r['success']:
             # Only raise an error if it's on an object. We don't expect containers
             # to be able to be created by users with reduced permissions, but they
@@ -83,6 +101,9 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
                 segment_container = segment_path.pop(0)
                 segments.append(os.path.sep.join(segment_path))
             ### /Workaround
+            else:
+                if upload_success_message:
+                    print upload_success_message % r['object']
 
     ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
     if segment_container and len(segments) > 0:
@@ -93,6 +114,8 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M"):
         print "WARNING: Error response in setting expiration for some segments on: %s." % name
         print "WARNING: The segments will likely still end up with a correct expiration time."
     ### /Workaround
+
+    del upload_buffer[bucket]
 
     # TODO: Only update if checksums don't match
 
@@ -108,6 +131,26 @@ def list_objects(bucket, ignore_partial=True):
         return [obj for obj in objects if obj['content_type'] != 'application/octet-stream']
     else:
         return objects
+
+# Usage:
+#
+# for obj in lmc.swift.object_iter("some_container"):
+#     do_something_with(obj)
+class object_iter:
+    def __init__(self, bucket):
+        self.bucket = bucket
+        self.listing_chunks = swift_service().list(bucket)
+        self.listing_iter = iter(next(self.listing_chunks)['listing'])
+    def __iter__(self):
+        return self
+    def next(self):
+        try:
+            obj = next(self.listing_iter)
+            return SwiftObject(obj['name'], container=self.bucket, raw_object=obj)
+        except StopIteration:
+            self.listing_iter = iter(next(self.listing_chunks)['listing'])
+            obj = next(self.listing_iter)
+            return SwiftObject(obj['name'], container=self.bucket, raw_object=obj)
 
 def find_objects(bucket, regex):
     return [obj for obj in list_objects(bucket) if regex.match(obj['name'])]
