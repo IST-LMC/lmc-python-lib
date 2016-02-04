@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 setup(name='lmc-python-lib',
-      version='1.8',
+      version='1.9',
       packages=find_packages(),
 	  install_requires = [
 	  	'python-swiftclient',
@@ -9,5 +9,6 @@ setup(name='lmc-python-lib',
 		'pyopenssl',
 		'ndg-httpsclient',
 		'pyasn1',
-        'psycopg2']
+        'psycopg2',
+        'python-dateutil']
       )
