@@ -82,6 +82,10 @@ def flush_upload_buffer(bucket):
     global upload_buffer
     global upload_success_message
 
+    # Nothing buffered
+    if bucket not in upload_buffer:
+        return
+
     ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
     segments = []
     segment_container = None
