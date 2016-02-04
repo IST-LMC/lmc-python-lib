@@ -1,4 +1,4 @@
-#!/usr/local/lmc-python/bin/python
+#!/opt/lmc-python/bin/python
 
 import lmc, os
 

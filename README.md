@@ -52,7 +52,7 @@ sudo /vagrant/scripts/rebuild-virtualenv.sh
 
 *rebuild-virtualenv.sh*
 
-Creates a virtual environment in /usr/local/lmc-python and installs lmc-python-lib and its dependencies in that location. If run again, it will remove the old version before re-creating.
+Creates a virtual environment in /opt/lmc-python and installs lmc-python-lib and its dependencies in that location. If run again, it will remove the old version before re-creating.
 
 *setup-test-containers.sh*
 
