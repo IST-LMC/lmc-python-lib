@@ -227,6 +227,12 @@ class SwiftObject:
         if not self.metadata:
             self.metadata = next(swift_service().stat(self.container, [ self.name ]))['headers']
         return self.metadata
+        
+    def bytes(self):
+        if self.raw_object and int(self.raw_object['bytes']) != 0:
+            return int(self.raw_object['bytes'])
+        else:
+            return int(self.get_metadata()['content-length'])
 
 def __normalized_segment_size(segment_size):
     # Adapted from python-swiftclient code
