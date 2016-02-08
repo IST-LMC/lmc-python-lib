@@ -127,7 +127,10 @@ def list_objects(bucket, ignore_partial=True):
     objects = []
     listing_chunks = swift_service().list(bucket)
     for listing_chunk in listing_chunks:
-        objects.extend([ SwiftObject(obj['name'], container=bucket, raw_object=obj) for obj in listing_chunk['listing'] ])
+        if listing_chunk['success']:
+            objects.extend([ SwiftObject(obj['name'], container=bucket, raw_object=obj) for obj in listing_chunk['listing'] ])
+        else:
+            raise listing_chunk['error']
             
     if ignore_partial:
         # TODO: It turns out that application/octet-stream is also what plain .gz files get labelled as.
@@ -144,7 +147,11 @@ class object_iter:
     def __init__(self, bucket):
         self.bucket = bucket
         self.listing_chunks = swift_service().list(bucket)
-        self.listing_iter = iter(next(self.listing_chunks)['listing'])
+        listing_chunk = next(self.listing_chunks)
+        if listing_chunk['success']:
+            self.listing_iter = iter(listing_chunk['listing'])
+        else:
+            raise listing_chunk['error']
     def __iter__(self):
         return self
     def next(self):
@@ -152,7 +159,11 @@ class object_iter:
             obj = next(self.listing_iter)
             return SwiftObject(obj['name'], container=self.bucket, raw_object=obj)
         except StopIteration:
-            self.listing_iter = iter(next(self.listing_chunks)['listing'])
+            listing_chunk = next(self.listing_chunks)
+            if listing_chunk['success']:
+                self.listing_iter = iter(listing_chunk['listing'])
+            else:
+                raise listing_chunk['error']
             obj = next(self.listing_iter)
             return SwiftObject(obj['name'], container=self.bucket, raw_object=obj)
 
