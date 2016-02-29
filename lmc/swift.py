@@ -60,7 +60,7 @@ def upload(bucket, name, from_folder, ttl=None, segment_size="400M", buffer_size
 
     headers = []
     if ttl:
-        delete_after_header = 'X-Delete-After:%i' % ttl
+        delete_after_header = 'x-delete-after:%i' % ttl
         headers.append(delete_after_header)
 
     options = {
@@ -86,11 +86,6 @@ def flush_upload_buffer(bucket):
     if bucket not in upload_buffer:
         return
 
-    ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
-    segments = []
-    segment_container = None
-    ### /Workaround
-
     for r in swift_service().upload(bucket, upload_buffer[bucket]):
         if not r['success']:
             # Only raise an error if it's on an object. We don't expect containers
@@ -99,33 +94,23 @@ def flush_upload_buffer(bucket):
             if not ('action' in r and r['action'] == "create_container"):
                 raise r['error']
         else:
-            ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
-            if 'action' in r and r['action'] == "upload_segment":
-                segment_path = [x for x in r['segment_location'].split(os.path.sep) if x != '']
-                segment_container = segment_path.pop(0)
-                segments.append(os.path.sep.join(segment_path))
-            ### /Workaround
-            else:
+            if 'action' in r and r['action'] == "upload_object":
                 if upload_success_message:
                     print upload_success_message % r['object']
-
-    ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
-    if segment_container and len(segments) > 0:
-        set_expiration_error = False
-        for r in swift_service().post(segment_container, segments, { 'header': [ delete_after_header ]}):
-            if not r['success']:
-                set_expiration_error = True
-        print "WARNING: Error response in setting expiration for some segments on: %s." % name
-        print "WARNING: The segments will likely still end up with a correct expiration time."
-    ### /Workaround
+                if r['large_object']:
+                    __large_object_expiration_workaround(bucket, r['object'])
 
     del upload_buffer[bucket]
 
     # TODO: Only update if checksums don't match
 
-def list_objects(bucket, ignore_partial=True):
+def list_objects(bucket, ignore_partial=True, prefix=None):
     objects = []
-    listing_chunks = swift_service().list(bucket)
+    options = {}
+    if prefix:
+        options['prefix'] = prefix
+
+    listing_chunks = swift_service().list(bucket, options=options)
     for listing_chunk in listing_chunks:
         if listing_chunk['success']:
             objects.extend([ SwiftObject(obj['name'], container=bucket, raw_object=obj) for obj in listing_chunk['listing'] ])
@@ -178,10 +163,30 @@ def get_object(bucket, name):
         return None
 
 def expire_object(bucket, name, ttl):
-    delete_after_header = 'X-Delete-After:%i' % ttl
-    result = next(swift_service().post(bucket, [ name ], { 'header': [ delete_after_header ]}))
+    result = update_headers(bucket, name, { 'x-delete-after': ttl })
     if not result['success']:
         print "ERROR: Couldn't set ttl on %s/%s" % (bucket, name)
+
+    if 'headers' in result:
+        headers = [ h.lower() for h in result['headers'] ]
+        if 'x-object-manifest' in headers:
+            __large_object_expiration_workaround(bucket, name)
+
+def update_headers(bucket, name, headers):
+    obj = get_object(bucket, name)
+    
+    if obj and obj.metadata:
+        do_not_reset = ['content-length', 'accept-ranges', 'last-modified', 'etag', 'x-timestamp',
+                        'x-trans-id', 'date', 'content-type']
+        replacement_headers = { k:v for (k,v) in obj.metadata.items() if k not in do_not_reset }
+        replacement_headers.update(headers)
+    else:
+        replacement_headers = headers
+
+    header_strings = [ "%s: %s" % (k,replacement_headers[k]) for k in replacement_headers ]
+
+    result = next(swift_service().post(bucket, [ name ], { 'header': header_strings }))
+    return result
 
 # Get the x-timestamp of the object (this involves a metadata query)
 def get_timestamp(obj):
@@ -258,3 +263,30 @@ def __normalized_segment_size(segment_size):
             print("Invalid segment size")
 
         return str((1024 ** size_mod) * multiplier)
+
+def __container_from_manifest(manifest):
+    path_parts = [p for p in manifest.split("/") if p != '']
+    return path_parts[0]
+    
+def __path_prefix_from_manifest(manifest):
+    path_parts = [p for p in manifest.split("/") if p != '']
+    return "/".join(path_parts[1:])
+    
+def __large_object_expiration_workaround(container, name):
+    ### Workaround for: https://bugs.launchpad.net/python-swiftclient/+bug/1478830
+    main_object = get_object(container, name)
+    set_expiration_error = False
+
+    if 'x-delete-at' in main_object.metadata:
+        if 'x-object-manifest' in main_object.metadata:
+            manifest = main_object.metadata['x-object-manifest']
+            segment_container = __container_from_manifest(manifest)
+            path_prefix = __path_prefix_from_manifest(manifest)
+            for obj in list_objects(segment_container, ignore_partial=False, prefix=path_prefix):
+                r = update_headers(segment_container, obj.name, { 'x-delete-at': main_object.metadata['x-delete-at'] })
+                if not r['success']:
+                    set_expiration_error = True
+    if set_expiration_error:
+        print "WARNING: Error response in setting expiration for some segments on: %s." % name
+        print "WARNING: The segments will likely still end up with a correct expiration time."
+    ### /Workaround
