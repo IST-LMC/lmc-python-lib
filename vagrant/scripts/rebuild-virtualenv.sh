@@ -12,5 +12,5 @@ sudo apt-get install libpq-dev -y
 rm -fr /opt/lmc-python
 virtualenv -p /usr/bin/python2.7 /opt/lmc-python
 source /opt/lmc-python/bin/activate
-pip install git+git://github.com/cybera/lmc-python-lib.git@no-pyrax
+pip install git+git://github.com/cybera/lmc-python-lib.git@master
 deactivate

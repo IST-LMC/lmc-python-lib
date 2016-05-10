@@ -7,7 +7,6 @@ lmc-python-lib
 
 ```bash
 git clone git@github.com:cybera/lmc-python-lib.git
-git checkout no-pyrax
 ```
 
 #### Creating the development environment
@@ -67,7 +66,7 @@ Example script to exercise the lmc-python-lib library.
 *(...as done in the rebuild-virtualenv.sh script...)*
 
 ```bash
-pip install git+git://github.com/cybera/lmc-python-lib.git@no-pyrax
+pip install git+git://github.com/cybera/lmc-python-lib.git@master
 ```
 
 #### Building an Ubuntu install package
